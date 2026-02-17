@@ -6,11 +6,10 @@
     <title>YouTube RSS Feed</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jquery/3.6.0/jquery.min.js"></script>
     <style>
-        /* Ρύθμιση CSS Grid για τη διάταξη των βίντεο */
         #video-container {
             display: grid;
-            grid-template-columns: repeat(4, 1fr); /* 4 στήλες */
-            gap: 20px; /* Απόσταση μεταξύ των στοιχείων */
+            grid-template-columns: repeat(4, 1fr);
+            gap: 20px;
             margin: 20px;
         }
 
@@ -30,13 +29,13 @@
         
         @media (max-width: 768px) {
             #video-container {
-                grid-template-columns: repeat(2, 1fr); /* 2 στήλες σε κινητά */
+                grid-template-columns: repeat(2, 1fr);
             }
         }
         
         @media (max-width: 480px) {
             #video-container {
-                grid-template-columns: 1fr; /* 1 στήλη σε πολύ μικρές οθόνες */
+                grid-template-columns: 1fr;
             }
         }
     </style>
@@ -47,38 +46,33 @@
 
     <script>
         // Χρήση CORS-anywhere για παρακάμψη του CORS
-        var proxyUrl = 'https://cors-anywhere.herokuapp.com/'; // Proxy URL του CORS-anywhere
-        var feedUrl = "https://www.youtube.com/feeds/videos.xml?channel_id=UCsTcErHg8oDvUnTzoqsYeNw";  // Feed URL
+        var proxyUrl = 'https://cors-anywhere.herokuapp.com/';
+        // ΤΟ ΝΕΟ FEED ΠΟΥ ΜΟΥ ΕΔΩΣΕΣ
+        var feedUrl = "https://www.youtube.com/feeds/videos.xml?channel_id=UCMiJRAwDNSNzuYeN2uWa0pA";
 
-        // Φόρτωμα του RSS feed μέσω AJAX με χρήση του proxy server
         $.ajax({
-            url: proxyUrl + feedUrl,  // Σύνδεση με το proxy
+            url: proxyUrl + feedUrl,
             type: "GET",
             dataType: "xml",
             success: function(data) {
                 var count = 0;
-                var maxVideos = 10;  // Τώρα θέλουμε 10 βίντεο
+                var maxVideos = 10;
                 
-                // Καθαρίζουμε το container πριν προσθέσουμε νέα βίντεο
                 $('#video-container').empty();
                 
                 $(data).find("entry").each(function() {
-                    // Σταματάμε όταν έχουμε 10 βίντεο
                     if (count >= maxVideos) return false;
                     
                     var title = $(this).find("title").text();
                     var link = $(this).find("link").attr("href");
                     
-                    // Φιλτράρισμα για να αγνοήσουμε τα YouTube Shorts
                     if (title.toLowerCase().includes("shorts") || link.toLowerCase().includes("/shorts/")) {
-                        return true; // Συνεχίζουμε στο επόμενο βίντεο
+                        return true;
                     }
 
-                    // Εξαγωγή video ID από το link
                     var videoId = '';
                     if (link.includes('v=')) {
                         videoId = link.split('v=')[1];
-                        // Αφαίρεση παραμέτρων μετά το video ID
                         var ampersandPosition = videoId.indexOf('&');
                         if (ampersandPosition != -1) {
                             videoId = videoId.substring(0, ampersandPosition);
@@ -88,16 +82,12 @@
                     }
 
                     if (videoId) {
-                        // Δημιουργία iframe για κάθε βίντεο
                         var iframe = '<div class="video-item"><iframe src="https://www.youtube.com/embed/' + videoId + '" frameborder="0" allowfullscreen></iframe><p>' + title + '</p></div>';
-
-                        // Προσθήκη στο video-container
                         $('#video-container').append(iframe);
                         count++;
                     }
                 });
                 
-                // Αν δεν βρέθηκαν αρκετά βίντεο, εμφάνισε μήνυμα
                 if (count === 0) {
                     $('#video-container').html('<p>Δεν βρέθηκαν βίντεο ή όλα ήταν Shorts.</p>');
                 } else if (count < maxVideos) {

@@ -14,9 +14,9 @@
             margin: 20px;
         }
 
-        /* Ειδική ρύθμιση για την τελευταία σειρά (3 στοιχεία) */
+        /* Ειδική ρύθμιση για την τελευταία σειρά (2 στοιχεία) */
         #video-container:nth-child(3) {
-            grid-template-columns: repeat(3, 1fr); /* 3 στήλες για την τελευταία σειρά */
+            grid-template-columns: repeat(2, 1fr); /* 2 στήλες για την τελευταία σειρά */
         }
 
         iframe {
@@ -40,7 +40,6 @@
             type: "GET",
             dataType: "xml",
             success: function(data) {
-                // Διαβάζουμε το XML και εμφανίζουμε τα βίντεο ως iframe
                 var count = 0;
                 $(data).find("entry").each(function() {
                     var title = $(this).find("title").text();

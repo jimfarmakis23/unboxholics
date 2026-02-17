@@ -41,7 +41,7 @@
             dataType: "xml",
             success: function(data) {
                 var count = 0;
-                var maxVideos = 10;  // Θέλουμε να δείξουμε μόνο 10 βίντεο
+                var maxVideos = 5;  // Θέλουμε να δείξουμε μόνο 5 βίντεο
                 $(data).find("entry").each(function() {
                     var title = $(this).find("title").text();
                     var link = $(this).find("link").attr("href");
@@ -60,8 +60,8 @@
                     $('#video-container').append(iframe);
                     count++;
 
-                    // Σταματάμε όταν έχουμε 10 βίντεο
-                    if (count >= maxVideos) return false; // Διακόπτουμε όταν έχουμε 10 βίντεο
+                    // Σταματάμε όταν έχουμε 5 βίντεο
+                    if (count >= maxVideos) return false; // Διακόπτουμε όταν έχουμε 5 βίντεο
                 });
             },
             error: function() {

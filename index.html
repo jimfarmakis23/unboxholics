@@ -14,19 +14,35 @@
             margin: 20px;
         }
 
-        /* Ειδική ρύθμιση για την τελευταία σειρά (2 στοιχεία) */
-        #video-container:nth-child(3) {
-            grid-template-columns: repeat(2, 1fr); /* 2 στήλες για την τελευταία σειρά */
-        }
-
         iframe {
             width: 100%;
             height: 200px;
         }
+        
+        .video-item {
+            text-align: center;
+        }
+        
+        .video-item p {
+            margin: 10px 0;
+            font-size: 14px;
+        }
+        
+        @media (max-width: 768px) {
+            #video-container {
+                grid-template-columns: repeat(2, 1fr); /* 2 στήλες σε κινητά */
+            }
+        }
+        
+        @media (max-width: 480px) {
+            #video-container {
+                grid-template-columns: 1fr; /* 1 στήλη σε πολύ μικρές οθόνες */
+            }
+        }
     </style>
 </head>
 <body>
-    <h1>YouTube Channel Videos</h1>
+    <h1>YouTube Channel Videos - Τελευταία 10 βίντεο</h1>
     <div id="video-container"></div>
 
     <script>
@@ -41,31 +57,56 @@
             dataType: "xml",
             success: function(data) {
                 var count = 0;
-                var maxVideos = 5;  // Θέλουμε να δείξουμε μόνο 5 βίντεο
+                var maxVideos = 10;  // Τώρα θέλουμε 10 βίντεο
+                
+                // Καθαρίζουμε το container πριν προσθέσουμε νέα βίντεο
+                $('#video-container').empty();
+                
                 $(data).find("entry").each(function() {
+                    // Σταματάμε όταν έχουμε 10 βίντεο
+                    if (count >= maxVideos) return false;
+                    
                     var title = $(this).find("title").text();
                     var link = $(this).find("link").attr("href");
                     
                     // Φιλτράρισμα για να αγνοήσουμε τα YouTube Shorts
                     if (title.toLowerCase().includes("shorts") || link.toLowerCase().includes("/shorts/")) {
-                        return; // Αγνοούμε αυτό το βίντεο
+                        return true; // Συνεχίζουμε στο επόμενο βίντεο
                     }
 
-                    var videoId = link.split('=')[1]; // Ανάγνωση του video ID από τον σύνδεσμο
+                    // Εξαγωγή video ID από το link
+                    var videoId = '';
+                    if (link.includes('v=')) {
+                        videoId = link.split('v=')[1];
+                        // Αφαίρεση παραμέτρων μετά το video ID
+                        var ampersandPosition = videoId.indexOf('&');
+                        if (ampersandPosition != -1) {
+                            videoId = videoId.substring(0, ampersandPosition);
+                        }
+                    } else if (link.includes('youtu.be/')) {
+                        videoId = link.split('youtu.be/')[1];
+                    }
 
-                    // Δημιουργία iframe για κάθε βίντεο
-                    var iframe = '<div><iframe src="https://www.youtube.com/embed/' + videoId + '" frameborder="0" allowfullscreen></iframe><p>' + title + '</p></div>';
+                    if (videoId) {
+                        // Δημιουργία iframe για κάθε βίντεο
+                        var iframe = '<div class="video-item"><iframe src="https://www.youtube.com/embed/' + videoId + '" frameborder="0" allowfullscreen></iframe><p>' + title + '</p></div>';
 
-                    // Προσθήκη στο video-container
-                    $('#video-container').append(iframe);
-                    count++;
-
-                    // Σταματάμε όταν έχουμε 5 βίντεο
-                    if (count >= maxVideos) return false; // Διακόπτουμε όταν έχουμε 5 βίντεο
+                        // Προσθήκη στο video-container
+                        $('#video-container').append(iframe);
+                        count++;
+                    }
                 });
+                
+                // Αν δεν βρέθηκαν αρκετά βίντεο, εμφάνισε μήνυμα
+                if (count === 0) {
+                    $('#video-container').html('<p>Δεν βρέθηκαν βίντεο ή όλα ήταν Shorts.</p>');
+                } else if (count < maxVideos) {
+                    $('#video-container').append('<p style="grid-column: 1 / -1;">Σημείωση: Βρέθηκαν μόνο ' + count + ' βίντεο (τα υπόλοιπα ήταν Shorts ή δεν ήταν διαθέσιμα).</p>');
+                }
             },
-            error: function() {
-                alert("Δεν ήταν δυνατή η φόρτωση του RSS feed.");
+            error: function(xhr, status, error) {
+                console.error("Σφάλμα:", error);
+                alert("Δεν ήταν δυνατή η φόρτωση του RSS feed. Παρακαλώ δοκιμάστε ξανά.");
             }
         });
     </script>

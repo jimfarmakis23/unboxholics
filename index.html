@@ -3,13 +3,13 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>YouTube RSS Feed - Τελευταία 20 βίντεο</title>
+    <title>YouTube Videos</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jquery/3.6.0/jquery.min.js"></script>
     <style>
         #video-container {
             display: grid;
-            grid-template-columns: repeat(4, 1fr);
-            gap: 20px;
+            grid-template-columns: repeat(4, 1fr); /* 4 στήλες */
+            gap: 20px; /* Απόσταση μεταξύ των στοιχείων */
             margin: 20px;
         }
 
@@ -17,96 +17,8 @@
             width: 100%;
             height: 200px;
         }
-        
-        .video-item {
-            text-align: center;
-        }
-        
-        .video-item p {
-            margin: 10px 0;
-            font-size: 14px;
-            height: 40px;
-            overflow: hidden;
-        }
-        
-        @media (max-width: 768px) {
-            #video-container {
-                grid-template-columns: repeat(2, 1fr);
-            }
-        }
-        
-        @media (max-width: 480px) {
-            #video-container {
-                grid-template-columns: 1fr;
-            }
-        }
     </style>
 </head>
 <body>
-    <h1>YouTube Channel Videos - Τελευταία 20 βίντεο</h1>
-    <div id="video-container"></div>
-
-    <script>
-        // Χρήση CORS-anywhere για παρακάμψη του CORS
-        var proxyUrl = 'https://cors-anywhere.herokuapp.com/';
-        var feedUrl = "https://www.youtube.com/feeds/videos.xml?channel_id=UCMiJRAwDNSNzuYeN2uWa0pA";
-
-        $.ajax({
-            url: proxyUrl + feedUrl,
-            type: "GET",
-            dataType: "xml",
-            success: function(data) {
-                var count = 0;
-                var maxVideos = 20;
-                var shortsSkipped = 0;
-                
-                $('#video-container').empty();
-                
-                // Συνεχίζουμε να ψάχνουμε μέχρι να βρούμε 20 κανονικά βίντεο
-                $(data).find("entry").each(function() {
-                    // Αν έχουμε ήδη 20 κανονικά βίντεο, σταματάμε
-                    if (count >= maxVideos) return false;
-                    
-                    var title = $(this).find("title").text();
-                    var link = $(this).find("link").attr("href");
-                    
-                    // Έλεγχος για Shorts
-                    if (title.toLowerCase().includes("shorts") || link.toLowerCase().includes("/shorts/")) {
-                        shortsSkipped++;
-                        return true; // Συνεχίζουμε στο επόμενο χωρίς να αυξήσουμε το count
-                    }
-
-                    var videoId = '';
-                    if (link.includes('v=')) {
-                        videoId = link.split('v=')[1];
-                        var ampersandPosition = videoId.indexOf('&');
-                        if (ampersandPosition != -1) {
-                            videoId = videoId.substring(0, ampersandPosition);
-                        }
-                    } else if (link.includes('youtu.be/')) {
-                        videoId = link.split('youtu.be/')[1];
-                    }
-
-                    if (videoId) {
-                        var iframe = '<div class="video-item"><iframe src="https://www.youtube.com/embed/' + videoId + '" frameborder="0" allowfullscreen></iframe><p>' + title + '</p></div>';
-                        $('#video-container').append(iframe);
-                        count++; // Αυξάνουμε μόνο για κανονικά βίντεο
-                    }
-                });
-                
-                if (count === 0) {
-                    $('#video-container').html('<p>Δεν βρέθηκαν κανονικά βίντεο. Παρακάμφθηκαν ' + shortsSkipped + ' Shorts.</p>');
-                } else if (count < maxVideos) {
-                    $('#video-container').append('<p style="grid-column: 1 / -1;">Σημείωση: Βρέθηκαν μόνο ' + count + ' κανονικά βίντεο (παρακάμφθηκαν ' + shortsSkipped + ' Shorts).</p>');
-                } else {
-                    $('#video-container').append('<p style="grid-column: 1 / -1;">Εμφανίζονται τα τελευταία 20 κανονικά βίντεο (παρακάμφθηκαν ' + shortsSkipped + ' Shorts).</p>');
-                }
-            },
-            error: function(xhr, status, error) {
-                console.error("Σφάλμα:", error);
-                alert("Δεν ήταν δυνατή η φόρτωση του RSS feed. Παρακαλώ δοκιμάστε ξανά.");
-            }
-        });
-    </script>
-</body>
-</html>
+    <h1>YouTube Channel Videos from Text File</h1>
+    <div id="

@@ -5,29 +5,60 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>YouTube RSS Feed</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jquery/3.6.0/jquery.min.js"></script>
+    <style>
+        /* Ρύθμιση CSS Grid για τη διάταξη των βίντεο */
+        #video-container {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr); /* 4 στήλες */
+            gap: 20px; /* Απόσταση μεταξύ των στοιχείων */
+            margin: 20px;
+        }
+
+        /* Ειδική ρύθμιση για την τελευταία σειρά (3 στοιχεία) */
+        #video-container:nth-child(3) {
+            grid-template-columns: repeat(3, 1fr); /* 3 στήλες για την τελευταία σειρά */
+        }
+
+        iframe {
+            width: 100%;
+            height: 200px;
+        }
+    </style>
 </head>
 <body>
     <h1>YouTube Channel Videos</h1>
-    <ul id="video-list"></ul>
+    <div id="video-container"></div>
 
     <script>
-        // Χρήση Proxy Server για να παρακάμψουμε CORS
-        var proxyUrl = 'https://cors-anywhere.herokuapp.com/';
+        // Χρήση AllOrigins για παρακάμψη του CORS
+        var proxyUrl = 'https://api.allorigins.win/raw?url=';
         var feedUrl = "https://www.youtube.com/feeds/videos.xml?channel_id=UCsTcErHg8oDvUnTzoqsYeNw";  // Feed URL
 
         // Φόρτωμα του RSS feed μέσω AJAX με χρήση του proxy server
         $.ajax({
-            url: proxyUrl + feedUrl,
+            url: proxyUrl + encodeURIComponent(feedUrl),
             type: "GET",
             dataType: "xml",
             success: function(data) {
-                // Διαβάζουμε το XML και εμφανίζουμε τα βίντεο
+                // Διαβάζουμε το XML και εμφανίζουμε τα βίντεο ως iframe
+                var count = 0;
                 $(data).find("entry").each(function() {
                     var title = $(this).find("title").text();
                     var link = $(this).find("link").attr("href");
+                    var videoId = link.split('=')[1]; // Ανάγνωση του video ID από τον σύνδεσμο
 
-                    // Δημιουργία ενός στοιχείου λίστας για κάθε βίντεο
-                    $('#video-list').append('<li><a href="' + link + '" target="_blank">' + title + '</a></li>');
+                    // Δημιουργία iframe για κάθε βίντεο
+                    var iframe = '<div><iframe src="https://www.youtube.com/embed/' + videoId + '" frameborder="0" allowfullscreen></iframe><p>' + title + '</p></div>';
+
+                    // Προσθήκη στο video-container (σε 3 σειρές)
+                    $('#video-container').append(iframe);
+                    count++;
+
+                    // Αν έχουμε προσθέσει 4 βίντεο, πάμε στην επόμενη σειρά
+                    if (count === 4) {
+                        count = 0;
+                        $('#video-container').append('<div style="clear:both"></div>');
+                    }
                 });
             },
             error: function() {

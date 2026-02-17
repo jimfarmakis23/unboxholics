@@ -3,7 +3,7 @@ name: Αυτόματη ενημέρωση links.txt από YouTube RSS
 on:
   schedule:
     # Τρέχει κάθε ώρα (στο λεπτό 0)
-    - cron: '15 * * * *'
+    - cron: '1 * * * *'
   workflow_dispatch: # Σου επιτρέπει να το τρέξεις και με το χέρι από το GitHub
 
 permissions:

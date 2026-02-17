@@ -1,0 +1,81 @@
+name: Αυτόματη ενημέρωση links.txt από YouTube RSS
+
+on:
+  schedule:
+    # Τρέχει κάθε ώρα (στο λεπτό 0)
+    - cron: '0 * * * *'
+  workflow_dispatch: # Σου επιτρέπει να το τρέξεις και με το χέρι από το GitHub
+
+permissions:
+  contents: write
+
+jobs:
+  update-links:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Κατέβασμα repository
+        uses: actions/checkout@v4
+
+      - name: Βρες το τελευταίο βίντεο από το RSS
+        id: get_video
+        run: |
+          # ΤΟ ΔΙΚΟ ΣΟΥ RSS FEED
+          CHANNEL_ID="UCMiJRAwDNSNzuYeN2uWa0pA"
+          RSS_URL="https://www.youtube.com/feeds/videos.xml?channel_id=${CHANNEL_ID}"
+          
+          echo "Διαβάζω το RSS από: $RSS_URL"
+          
+          # Κατέβασε το RSS και βγάλε το πιο πρόσφατο link
+          LATEST_URL=$(curl -s "$RSS_URL" | grep -oP '(?<=<link rel="alternate" href=")[^"]+' | head -1)
+          
+          if [ -z "$LATEST_URL" ]; then
+            echo "❌ Δεν βρέθηκε link στο RSS"
+            exit 1
+          fi
+          
+          echo "✅ Τελευταίο βίντεο: $LATEST_URL"
+          echo "LATEST_URL=${LATEST_URL}" >> $GITHUB_OUTPUT
+
+      - name: Έλεγξε και ενημέρωσε το links.txt
+        env:
+          LATEST_LINK: ${{ steps.get_video.outputs.LATEST_URL }}
+        run: |
+          FILE="data/links.txt"
+          
+          # Αν το αρχείο δεν υπάρχει, δημιούργησέ το
+          if [ ! -f "$FILE" ]; then
+            echo "📁 Δεν βρέθηκε αρχείο. Το δημιουργώ..."
+            mkdir -p data
+            echo "$LATEST_LINK" > "$FILE"
+            echo "✅ Δημιουργήθηκε με το τελευταίο link."
+            exit 0
+          fi
+          
+          # Διάβασε την πρώτη γραμμή (το πιο πρόσφατο link που έχεις ήδη)
+          FIRST_LINE=$(head -n 1 "$FILE")
+          
+          # Αν το link από το RSS είναι ίδιο, μην κάνεις τίποτα
+          if [ "$FIRST_LINE" = "$LATEST_LINK" ]; then
+            echo "⏸️  Δεν υπάρχει νέο βίντεο. Κανένα update."
+            exit 0
+          fi
+          
+          # Αν είναι διαφορετικό (νέο βίντεο), πρόσθεσέ το στην αρχή
+          echo "🎉 ΝΕΟ ΒΙΝΤΕΟ: $LATEST_LINK"
+          echo -e "$LATEST_LINK\n$(cat $FILE)" > "$FILE"
+          echo "✅ Το links.txt ενημερώθηκε!"
+
+      - name: Κάνε commit και push τις αλλαγές
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add data/links.txt
+          
+          # Κάνε commit μόνο αν υπάρχουν αλλαγές
+          if git diff --staged --quiet; then
+            echo "ℹ️  Χωρίς αλλαγές για commit."
+          else
+            git commit -m "Αυτόματο update: Νέο βίντεο στο κανάλι"
+            git push
+            echo "🚀 Οι αλλαγές ανέβηκαν στο GitHub!"
+          fi

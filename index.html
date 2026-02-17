@@ -55,7 +55,7 @@
                     // Δημιουργία iframe για κάθε βίντεο
                     var iframe = '<div><iframe src="https://www.youtube.com/embed/' + videoId + '" frameborder="0" allowfullscreen></iframe><p>' + title + '</p></div>';
 
-                    // Προσθήκη στο video-container (σε 3 σειρές)
+                    // Προσθήκη στο video-container
                     $('#video-container').append(iframe);
                     count++;
 
@@ -64,6 +64,9 @@
                         count = 0;
                         $('#video-container').append('<div style="clear:both"></div>');
                     }
+
+                    // Σταματάμε όταν έχουμε 10 βίντεο
+                    if (count >= 10) return false; // Θα σταματήσει όταν έχουμε 10 βίντεο
                 });
             },
             error: function() {

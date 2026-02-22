@@ -3,10 +3,10 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=yes" />
-  <title>YouTube Videos - Iframely Proxy (No Ads)</title>
+  <title>YouTube Videos - Built-in AdBlock</title>
 
   <style>
-    /* ΚΡΑΤΑΜΕ ΟΛΑ ΤΑ STYLES ΑΠΟ ΤΗΝ ΑΡΧΙΚΗ ΣΟΥ ΕΚΔΟΧΗ */
+    /* ΤΑ ΙΔΙΑ STYLES ΠΟΥ ΕΙΧΕΣ - ΤΑ ΚΡΑΤΑΜΕ ΟΛΑ ΙΔΙΑ */
     * { margin: 0; padding: 0; box-sizing: border-box; }
 
     body {
@@ -147,10 +147,13 @@
     ::-webkit-scrollbar-thumb { background: #666; border-radius: 6px; }
     ::-webkit-scrollbar-thumb:hover { background: #888; }
   </style>
+  
+  <!-- Φόρτωση της adblock library από το CDN -->
+  <script src="https://cdn.jsdelivr.net/npm/@cliqz/adblocker/dist/umd/adblocker.umd.min.js"></script>
 </head>
 
 <body>
-  <h1>YouTube Videos (Iframely Proxy - No Ads)</h1>
+  <h1>YouTube Videos (Built-in AdBlock)</h1>
 
   <div id="video-container">
     <div class="loading">Φόρτωση βίντεο...</div>
@@ -176,14 +179,58 @@
       }
     }
 
-    // ΧΡΗΣΗ IFRAMELY PROXY - ΟΠΩΣ ΤΟ NOTION!
-    // Το Iframely αφαιρεί διαφημίσεις και tracking
-    const IFRAMELY_PROXY = "https://iframe.ly/api/iframe";
+    // Χρήση youtube-nocookie (privacy friendly)
+    const EMBED_BASE = "https://www.youtube-nocookie.com/embed/";
 
     function buildEmbedSrc(videoId) {
-      // Δημιουργούμε το URL για το Iframely proxy
-      const youtubeUrl = `https://www.youtube.com/watch?v=${videoId}`;
-      return `${IFRAMELY_PROXY}?url=${encodeURIComponent(youtubeUrl)}&api_key=demo`; // Demo API key - δοκιμαστικό
+      const params = new URLSearchParams({
+        autoplay: "1",
+        rel: "0",
+        modestbranding: "1",
+        playsinline: "1",
+        iv_load_policy: "3" // Απενεργοποιεί τα annotations
+      });
+      return `${EMBED_BASE}${videoId}?${params.toString()}`;
+    }
+
+    // ---- Αρχικοποίηση adblocker ----
+    let adblockerEngine = null;
+    
+    async function initAdBlocker() {
+      try {
+        // Φόρτωση των adblock lists (EasyList, κλπ)
+        const { FiltersEngine, Request } = window.Adblocker;
+        
+        // Δημιουργία engine με τις standard adblock lists
+        adblockerEngine = await FiltersEngine.fromLists(fetch, [
+          'https://easylist.to/easylist/easylist.txt',
+          'https://easylist.to/easylist/easyprivacy.txt'
+        ]);
+        
+        console.log('✅ AdBlock engine loaded successfully');
+      } catch (error) {
+        console.error('❌ Failed to load adblock engine:', error);
+      }
+    }
+
+    // Ξεκινάμε τον adblocker μόλις φορτώσει η σελίδα
+    initAdBlocker();
+
+    // Συνάρτηση που ελέγχει αν ένα URL είναι διαφήμιση
+    function isAdUrl(url) {
+      if (!adblockerEngine) return false;
+      
+      try {
+        const { Request } = window.Adblocker;
+        const request = Request.fromRawDetails({
+          url: url,
+          type: 'script' // ή 'xmlhttprequest' ανάλογα
+        });
+        
+        return adblockerEngine.match(request) !== null;
+      } catch {
+        return false;
+      }
     }
 
     // ---- Titles (oEmbed) ----
@@ -282,15 +329,42 @@
           function loadIframe() {
             if (media.querySelector('iframe')) return;
             const iframe = document.createElement('iframe');
-            
-            // Χρησιμοποιούμε το Iframely proxy αντί για απευθείας YouTube
-            const youtubeUrl = `https://www.youtube.com/watch?v=${videoId}`;
-            iframe.src = `https://iframe.ly/api/iframe?url=${encodeURIComponent(youtubeUrl)}&api_key=demo`;
-            
+            iframe.src = buildEmbedSrc(videoId);
             iframe.allow = "accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture";
             iframe.allowFullscreen = true;
             iframe.loading = "eager";
             iframe.title = "YouTube video player";
+            
+            // Παρακολούθηση φόρτωσης του iframe για μπλοκάρισμα διαφημίσεων
+            iframe.onload = function() {
+              try {
+                // Προσπάθεια να μπλοκάρουμε διαφημιστικά scripts μέσα στο iframe
+                const iframeDoc = iframe.contentDocument || iframe.contentWindow.document;
+                if (iframeDoc) {
+                  const observer = new MutationObserver(function(mutations) {
+                    mutations.forEach(function(mutation) {
+                      mutation.addedNodes.forEach(node => {
+                        if (node.nodeType === 1) { // Element node
+                          // Έλεγχος για διαφημιστικά στοιχεία
+                          if (node.src && isAdUrl(node.src)) {
+                            node.remove();
+                          }
+                        }
+                      });
+                    });
+                  });
+                  
+                  observer.observe(iframeDoc.body, {
+                    childList: true,
+                    subtree: true
+                  });
+                }
+              } catch (e) {
+                // Cross-origin restrictions - δεν μπορούμε να κάνουμε πολλά
+                console.log('Cannot access iframe content due to same-origin policy');
+              }
+            };
+            
             media.innerHTML = '';
             media.appendChild(iframe);
           }

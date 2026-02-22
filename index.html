@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="el">
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=yes" />
@@ -7,14 +7,12 @@
 
   <style>
     * { margin: 0; padding: 0; box-sizing: border-box; }
-
     body {
       background-color: #1a1a1a;
       font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, sans-serif;
       min-height: 100vh;
       padding: 20px;
     }
-
     h1 {
       color: #ffffff;
       text-align: center;
@@ -23,7 +21,6 @@
       font-weight: 400;
       letter-spacing: 1px;
     }
-
     #video-container {
       display: grid;
       grid-template-columns: repeat(3, 1fr);
@@ -31,7 +28,6 @@
       max-width: 1680px;
       margin: 0 auto;
     }
-
     .video-card {
       background-color: #2d2d2d;
       border-radius: 12px;
@@ -43,14 +39,12 @@
       transform: translateY(-4px);
       box-shadow: 0 8px 12px rgba(0,0,0,0.4);
     }
-
     .video-media {
       position: relative;
       width: 100%;
       padding-bottom: 62.5%;
       background: #000;
     }
-
     .video-media iframe {
       position: absolute;
       inset: 0;
@@ -59,7 +53,6 @@
       border: none;
       background: #000;
     }
-
     .video-thumb {
       position: absolute;
       inset: 0;
@@ -72,7 +65,6 @@
       justify-content: center;
       user-select: none;
     }
-
     .video-thumb img {
       width: 100%;
       height: 100%;
@@ -80,7 +72,6 @@
       display: block;
       filter: saturate(1.05) contrast(1.05);
     }
-
     .video-thumb::after {
       content: "";
       width: 64px;
@@ -131,10 +122,23 @@
       border: 1px solid #ff6b6b;
     }
 
+    .mini-error {
+      position: absolute;
+      inset: 0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 14px;
+      text-align: center;
+      color: #ffb3b3;
+      background: rgba(0,0,0,0.65);
+      font-size: 0.95rem;
+      line-height: 1.25rem;
+    }
+
     @media screen and (max-width: 1024px) {
       #video-container { grid-template-columns: repeat(2, 1fr); gap: 14px; }
     }
-
     @media screen and (max-width: 480px) {
       body { padding: 10px; }
       #video-container { grid-template-columns: 1fr; gap: 15px; }
@@ -151,6 +155,9 @@
   </div>
 
   <script>
+    // -----------------------------
+    // Helpers
+    // -----------------------------
     function getVideoId(url) {
       try {
         url = url.trim();
@@ -158,43 +165,67 @@
           /(?:youtube\.com\/watch\?v=|youtu\.be\/|youtube\.com\/embed\/)([^&\n?#]+)/,
           /youtube\.com\/watch\?.+&v=([^&\n?#]+)/
         ];
-        for (let pattern of patterns) {
+        for (const pattern of patterns) {
           const match = url.match(pattern);
           if (match) return match[1];
         }
         const urlObj = new URL(url);
         return urlObj.searchParams.get('v');
-      } catch (e) {
-        console.error('Error parsing URL:', url);
+      } catch {
         return null;
       }
     }
 
-    // Λίστα με αξιόπιστα Invidious instances (χωρίς διαφημίσεις)
-    const INVIDIOUS_INSTANCES = [
-      'https://invidious.snopyta.org',
-      'https://yewtu.be',
-      'https://invidious.kavin.rocks',
-      'https://inv.riverside.rocks',
-      'https://invidious.flokinet.to',
-      'https://invidious.esmailelbob.xyz'
-    ];
-    
-    // Επιλέγουμε τυχαίο instance για να μην υπερφορτώνουμε ένα
-    const randomInstance = INVIDIOUS_INSTANCES[Math.floor(Math.random() * INVIDIOUS_INSTANCES.length)];
+    function timeoutFetch(url, ms = 3500, opts = {}) {
+      const ctrl = new AbortController();
+      const t = setTimeout(() => ctrl.abort(), ms);
+      return fetch(url, { ...opts, signal: ctrl.signal })
+        .finally(() => clearTimeout(t));
+    }
 
-    function buildEmbedSrc(videoId) {
+    // -----------------------------
+    // Invidious instances
+    // ΣΗΜΑΝΤΙΚΟ: Τα instances αλλάζουν συχνά.
+    // Κρατάμε λίστα, αλλά διαλέγουμε μόνο αυτά που "απαντάνε".
+    // -----------------------------
+    const INVIDIOUS_INSTANCES = [
+      "https://yewtu.be",
+      "https://invidious.privacydev.net",
+      "https://inv.nadeko.net",
+      "https://invidious.lunar.icu",
+      "https://vid.puffyan.us",
+      "https://invidious.protokolla.fi"
+    ];
+
+    let ACTIVE_INSTANCE = null;
+
+    async function pickWorkingInstance() {
+      // Δοκιμάζουμε γρήγορα ποιο instance απαντάει.
+      // Χρησιμοποιούμε endpoint που συνήθως υπάρχει: /api/v1/stats
+      for (const base of INVIDIOUS_INSTANCES) {
+        try {
+          const res = await timeoutFetch(`${base}/api/v1/stats`, 2500, { cache: "no-store" });
+          if (res.ok) return base;
+        } catch {}
+      }
+      return null;
+    }
+
+    function buildEmbedSrc(instance, videoId) {
       const params = new URLSearchParams({
         autoplay: "1",
         rel: "0",
         modestbranding: "1",
         playsinline: "1"
       });
-      return `${randomInstance}/embed/${videoId}?${params.toString()}`;
+      return `${instance}/embed/${videoId}?${params.toString()}`;
     }
 
-    // Φόρτωση τίτλων από το YouTube oEmbed
+    // -----------------------------
+    // Titles via YouTube oEmbed (συνήθως δουλεύει χωρίς key)
+    // -----------------------------
     const titleCache = new Map();
+
     async function fetchTitle(videoId) {
       if (titleCache.has(videoId)) return titleCache.get(videoId);
 
@@ -202,7 +233,7 @@
         `https://www.youtube.com/oembed?url=${encodeURIComponent("https://www.youtube.com/watch?v=" + videoId)}&format=json`;
 
       try {
-        const res = await fetch(oembedUrl);
+        const res = await timeoutFetch(oembedUrl, 5000);
         if (!res.ok) throw new Error("oEmbed failed");
         const data = await res.json();
         const title = (data && data.title) ? data.title : "YouTube Video";
@@ -215,131 +246,199 @@
       }
     }
 
-    // Φόρτωση των links από το αρχείο
-    fetch('data/links.txt')
-      .then(response => {
-        if (!response.ok) {
-          throw new Error(`Το αρχείο data/links.txt δεν βρέθηκε (Status: ${response.status})`);
-        }
-        return response.text();
-      })
-      .then(text => {
-        const container = document.getElementById('video-container');
-        container.innerHTML = '';
+    // -----------------------------
+    // Load links
+    // -----------------------------
+    async function loadLinksText() {
+      // cache-bust για GitHub Pages (να μην κρατάει παλιά έκδοση)
+      const url = `data/links.txt?v=${Date.now()}`;
+      const res = await fetch(url, { cache: "no-store" });
+      if (!res.ok) {
+        throw new Error(`Το αρχείο data/links.txt δεν βρέθηκε (Status: ${res.status})`);
+      }
+      return await res.text();
+    }
 
-        const links = text.split('\n')
-          .map(line => line.trim())
-          .filter(line => line && !line.startsWith('#'));
+    // -----------------------------
+    // Main
+    // -----------------------------
+    (async function init() {
+      const container = document.getElementById("video-container");
 
-        if (links.length === 0) {
-          container.innerHTML = '<div class="error-message">Δεν βρέθηκαν links στο αρχείο</div>';
-          return;
-        }
+      // Αν τρέχεις ως file://, το fetch θα σπάσει.
+      if (location.protocol === "file:") {
+        container.innerHTML = `
+          <div class="error-message">
+            ❌ Ανοίγεις το αρχείο ως <b>file://</b> και το fetch("data/links.txt") μπλοκάρεται.<br><br>
+            ✅ Λύση:<br>
+            1) Ανέβασέ το σε GitHub Pages (ή άλλο hosting) ή<br>
+            2) Τρέξε local server (π.χ. VS Code → Live Server).<br>
+          </div>`;
+        return;
+      }
 
-        // Intersection Observer για lazy loading
-        const observer = new IntersectionObserver((entries, obs) => {
-          for (const entry of entries) {
-            if (!entry.isIntersecting) continue;
+      // Βρες instance που απαντάει
+      ACTIVE_INSTANCE = await pickWorkingInstance();
+      if (!ACTIVE_INSTANCE) {
+        container.innerHTML = `
+          <div class="error-message">
+            ❌ Δεν βρέθηκε διαθέσιμο Invidious instance αυτή τη στιγμή.<br><br>
+            Δοκίμασε αργότερα ή άλλαξε τη λίστα instances.
+          </div>`;
+        return;
+      }
 
-            const thumb = entry.target;
-            const videoId = thumb.dataset.videoId;
-            const titleEl = document.getElementById(`title-${thumb.dataset.idx}`);
+      let text;
+      try {
+        text = await loadLinksText();
+      } catch (err) {
+        container.innerHTML = `
+          <div class="error-message">
+            ❌ Σφάλμα: ${err.message}<br><br>
+            Βεβαιώσου ότι:<br>
+            1) Το αρχείο <b>data/links.txt</b> υπάρχει στο repository<br>
+            2) Το <b>index.html</b> είναι στο root<br>
+            3) Τα links είναι σωστά (ένα σε κάθε γραμμή)
+          </div>`;
+        return;
+      }
 
-            // Φόρτωση thumbnail
-            if (!thumb.dataset.thumbLoaded) {
-              const img = document.createElement('img');
-              const maxres = `https://i.ytimg.com/vi/${videoId}/maxresdefault.jpg`;
-              const hq = `https://i.ytimg.com/vi/${videoId}/hqdefault.jpg`;
-              img.loading = "lazy";
-              img.src = maxres;
-              img.onerror = () => { img.src = hq; };
-              thumb.appendChild(img);
-              thumb.dataset.thumbLoaded = "1";
-            }
+      const links = text.split("\n")
+        .map(l => l.trim())
+        .filter(l => l && !l.startsWith("#"));
 
-            // Φόρτωση τίτλου
-            if (titleEl && !titleEl.dataset.titleLoaded) {
-              titleEl.dataset.titleLoaded = "1";
-              fetchTitle(videoId).then(t => { titleEl.textContent = t; });
-            }
+      if (links.length === 0) {
+        container.innerHTML = `<div class="error-message">Δεν βρέθηκαν links στο αρχείο</div>`;
+        return;
+      }
 
-            obs.unobserve(thumb);
+      container.innerHTML = "";
+
+      // Intersection Observer για lazy loading thumbs/titles
+      const observer = new IntersectionObserver((entries, obs) => {
+        for (const entry of entries) {
+          if (!entry.isIntersecting) continue;
+
+          const thumb = entry.target;
+          const videoId = thumb.dataset.videoId;
+          const titleEl = document.getElementById(`title-${thumb.dataset.idx}`);
+
+          // Thumbnail
+          if (!thumb.dataset.thumbLoaded) {
+            const img = document.createElement("img");
+            const maxres = `https://i.ytimg.com/vi/${videoId}/maxresdefault.jpg`;
+            const hq = `https://i.ytimg.com/vi/${videoId}/hqdefault.jpg`;
+            img.loading = "lazy";
+            img.referrerPolicy = "no-referrer";
+            img.src = maxres;
+            img.onerror = () => { img.src = hq; };
+            thumb.appendChild(img);
+            thumb.dataset.thumbLoaded = "1";
           }
-        }, {
-          root: null,
-          rootMargin: "500px",
-          threshold: 0.01
+
+          // Title
+          if (titleEl && !titleEl.dataset.titleLoaded) {
+            titleEl.dataset.titleLoaded = "1";
+            fetchTitle(videoId).then(t => { titleEl.textContent = t; });
+          }
+
+          obs.unobserve(thumb);
+        }
+      }, { root: null, rootMargin: "500px", threshold: 0.01 });
+
+      // Build cards
+      links.forEach((link, idx) => {
+        const videoId = getVideoId(link);
+        if (!videoId || videoId.length !== 11) return;
+
+        const card = document.createElement("div");
+        card.className = "video-card";
+
+        const media = document.createElement("div");
+        media.className = "video-media";
+
+        const thumb = document.createElement("div");
+        thumb.className = "video-thumb";
+        thumb.dataset.videoId = videoId;
+        thumb.dataset.idx = String(idx);
+        thumb.setAttribute("role", "button");
+        thumb.setAttribute("tabindex", "0");
+        thumb.setAttribute("aria-label", "Play video");
+
+        const title = document.createElement("div");
+        title.className = "video-title";
+        title.id = `title-${idx}`;
+        title.textContent = "...";
+
+        async function tryLoadIframeWithFallback() {
+          // Δοκίμασε πρώτα ACTIVE_INSTANCE, μετά άλλα instances αν αποτύχει.
+          const candidates = [ACTIVE_INSTANCE, ...INVIDIOUS_INSTANCES.filter(x => x !== ACTIVE_INSTANCE)];
+
+          for (const inst of candidates) {
+            try {
+              // μικρό "preflight": αν δεν απαντάει καθόλου, skip
+              const stats = await timeoutFetch(`${inst}/api/v1/stats`, 1800, { cache: "no-store" });
+              if (!stats.ok) continue;
+
+              const iframe = document.createElement("iframe");
+              iframe.src = buildEmbedSrc(inst, videoId);
+              iframe.allow = "accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture";
+              iframe.allowFullscreen = true;
+
+              // Αν το instance μπλοκάρει framing, συνήθως το iframe θα μείνει μαύρο.
+              // Δεν υπάρχει τέλειο event για XFO/CSP, αλλά κάνουμε best-effort:
+              await new Promise((resolve, reject) => {
+                const t = setTimeout(() => reject(new Error("embed timeout")), 3500);
+                iframe.onload = () => { clearTimeout(t); resolve(); };
+                iframe.onerror = () => { clearTimeout(t); reject(new Error("iframe error")); };
+              });
+
+              // επιτυχία
+              ACTIVE_INSTANCE = inst; // κρατάμε το καλό instance
+              media.innerHTML = "";
+              media.appendChild(iframe);
+              return;
+            } catch {
+              // δοκίμασε επόμενο
+            }
+          }
+
+          // Αν όλα αποτύχουν
+          media.innerHTML = `<div class="mini-error">
+            ❌ Δεν γίνεται embed από Invidious αυτή τη στιγμή.<br>
+            (δοκίμασε άλλο instance ή άνοιξε το link κανονικά)
+          </div>`;
+        }
+
+        function loadIframe() {
+          // μην ξαναφορτώνεις αν ήδη υπάρχει iframe ή error
+          if (media.querySelector("iframe")) return;
+          tryLoadIframeWithFallback();
+        }
+
+        thumb.addEventListener("click", loadIframe);
+        thumb.addEventListener("keydown", (e) => {
+          if (e.key === "Enter" || e.key === " ") {
+            e.preventDefault();
+            loadIframe();
+          }
         });
 
-        // Δημιουργία καρτών για κάθε link
-        links.forEach((link, idx) => {
-          const videoId = getVideoId(link);
-          if (!videoId || videoId.length !== 11) return;
+        media.appendChild(thumb);
+        card.appendChild(media);
+        card.appendChild(title);
+        container.appendChild(card);
 
-          const card = document.createElement('div');
-          card.className = 'video-card';
-
-          const media = document.createElement('div');
-          media.className = 'video-media';
-
-          const thumb = document.createElement('div');
-          thumb.className = 'video-thumb';
-          thumb.dataset.videoId = videoId;
-          thumb.dataset.idx = String(idx);
-          thumb.setAttribute('role', 'button');
-          thumb.setAttribute('tabindex', '0');
-          thumb.setAttribute('aria-label', 'Play video');
-
-          function loadIframe() {
-            if (media.querySelector('iframe')) return;
-            const iframe = document.createElement('iframe');
-            iframe.src = buildEmbedSrc(videoId);
-            iframe.allow = "accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture";
-            iframe.allowFullscreen = true;
-            iframe.loading = "eager";
-            media.innerHTML = '';
-            media.appendChild(iframe);
-          }
-
-          thumb.addEventListener('click', loadIframe);
-          thumb.addEventListener('keydown', (e) => {
-            if (e.key === 'Enter' || e.key === ' ') {
-              e.preventDefault();
-              loadIframe();
-            }
-          });
-
-          media.appendChild(thumb);
-
-          const title = document.createElement('div');
-          title.className = 'video-title';
-          title.id = `title-${idx}`;
-          title.textContent = '...';
-
-          card.appendChild(media);
-          card.appendChild(title);
-          container.appendChild(card);
-
-          observer.observe(thumb);
-        });
-
-        // Boost για τα πρώτα 3 βίντεο
-        const firstBoost = Math.min(3, links.length);
-        for (let i = 0; i < firstBoost; i++) {
-          const thumb = container.querySelector(`.video-thumb[data-idx="${i}"]`);
-          if (thumb) observer.observe(thumb);
-        }
-      })
-      .catch(error => {
-        document.getElementById('video-container').innerHTML =
-          `<div class="error-message">
-              ❌ Σφάλμα: ${error.message}<br><br>
-              Βεβαιώσου ότι:<br>
-              1. Το αρχείο data/links.txt υπάρχει στο repository<br>
-              2. Το index.html είναι στο root φάκελο<br>
-              3. Τα links είναι σωστά (ένα σε κάθε γραμμή)
-           </div>`;
+        observer.observe(thumb);
       });
+
+      // Boost πρώτα 3
+      const firstBoost = Math.min(3, links.length);
+      for (let i = 0; i < firstBoost; i++) {
+        const thumb = container.querySelector(`.video-thumb[data-idx="${i}"]`);
+        if (thumb) observer.observe(thumb);
+      }
+    })();
   </script>
 </body>
 </html>

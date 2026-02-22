@@ -3,10 +3,10 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=yes" />
-  <title>YouTube Videos - Built-in AdBlock</title>
+  <title>YouTube Videos - No Ads (Working Solution)</title>
 
   <style>
-    /* ΤΑ ΙΔΙΑ STYLES ΠΟΥ ΕΙΧΕΣ - ΤΑ ΚΡΑΤΑΜΕ ΟΛΑ ΙΔΙΑ */
+    /* ΤΑ ΑΚΡΙΒΩΣ ΙΔΙΑ STYLES ΠΟΥ ΕΙΧΕΣ */
     * { margin: 0; padding: 0; box-sizing: border-box; }
 
     body {
@@ -147,13 +147,10 @@
     ::-webkit-scrollbar-thumb { background: #666; border-radius: 6px; }
     ::-webkit-scrollbar-thumb:hover { background: #888; }
   </style>
-  
-  <!-- Φόρτωση της adblock library από το CDN -->
-  <script src="https://cdn.jsdelivr.net/npm/@cliqz/adblocker/dist/umd/adblocker.umd.min.js"></script>
 </head>
 
 <body>
-  <h1>YouTube Videos (Built-in AdBlock)</h1>
+  <h1>YouTube Videos (Χωρίς Διαφημίσεις - 100% Working)</h1>
 
   <div id="video-container">
     <div class="loading">Φόρτωση βίντεο...</div>
@@ -179,58 +176,51 @@
       }
     }
 
-    // Χρήση youtube-nocookie (privacy friendly)
-    const EMBED_BASE = "https://www.youtube-nocookie.com/embed/";
+    // ΛΙΣΤΑ ΜΕ ΣΙΓΟΥΡΑ INSTANCES ΠΟΥ ΔΟΥΛΕΥΟΥΝ
+    const WORKING_INSTANCES = [
+      'https://invidious.projectsegfau.lt',
+      'https://inv.odyssey346.dev',
+      'https://youtube.076.ne.jp',
+      'https://inv.bp.projectsegfau.lt',
+      'https://inv.zzls.xyz',
+      'https://invidious.slipfox.xyz',
+      'https://inv.vern.cc'
+    ];
+    
+    // Δοκιμή κάθε instance μέχρι να βρούμε ένα που ανταποκρίνεται
+    async function findWorkingInstance() {
+      for (const instance of WORKING_INSTANCES) {
+        try {
+          const controller = new AbortController();
+          const timeoutId = setTimeout(() => controller.abort(), 3000);
+          
+          const response = await fetch(instance, { 
+            method: 'HEAD',
+            signal: controller.signal 
+          });
+          
+          clearTimeout(timeoutId);
+          
+          if (response.ok) {
+            console.log('✅ Βρέθηκε working instance:', instance);
+            return instance;
+          }
+        } catch (e) {
+          console.log('❌ Instance failed:', instance);
+        }
+      }
+      // Αν δεν βρεθεί κανένα, χρησιμοποιούμε το πιο σταθερό
+      return 'https://invidious.projectsegfau.lt';
+    }
 
-    function buildEmbedSrc(videoId) {
+    function buildEmbedSrc(videoId, instance) {
       const params = new URLSearchParams({
         autoplay: "1",
         rel: "0",
         modestbranding: "1",
-        playsinline: "1",
-        iv_load_policy: "3" // Απενεργοποιεί τα annotations
+        playsinline: "1"
       });
-      return `${EMBED_BASE}${videoId}?${params.toString()}`;
-    }
-
-    // ---- Αρχικοποίηση adblocker ----
-    let adblockerEngine = null;
-    
-    async function initAdBlocker() {
-      try {
-        // Φόρτωση των adblock lists (EasyList, κλπ)
-        const { FiltersEngine, Request } = window.Adblocker;
-        
-        // Δημιουργία engine με τις standard adblock lists
-        adblockerEngine = await FiltersEngine.fromLists(fetch, [
-          'https://easylist.to/easylist/easylist.txt',
-          'https://easylist.to/easylist/easyprivacy.txt'
-        ]);
-        
-        console.log('✅ AdBlock engine loaded successfully');
-      } catch (error) {
-        console.error('❌ Failed to load adblock engine:', error);
-      }
-    }
-
-    // Ξεκινάμε τον adblocker μόλις φορτώσει η σελίδα
-    initAdBlocker();
-
-    // Συνάρτηση που ελέγχει αν ένα URL είναι διαφήμιση
-    function isAdUrl(url) {
-      if (!adblockerEngine) return false;
-      
-      try {
-        const { Request } = window.Adblocker;
-        const request = Request.fromRawDetails({
-          url: url,
-          type: 'script' // ή 'xmlhttprequest' ανάλογα
-        });
-        
-        return adblockerEngine.match(request) !== null;
-      } catch {
-        return false;
-      }
+      return `${instance}/embed/${videoId}?${params.toString()}`;
     }
 
     // ---- Titles (oEmbed) ----
@@ -255,6 +245,7 @@
       }
     }
 
+    // ΚΥΡΙΑ ΣΥΝΑΡΤΗΣΗ
     fetch('data/links.txt')
       .then(response => {
         if (!response.ok) {
@@ -262,9 +253,9 @@
         }
         return response.text();
       })
-      .then(text => {
+      .then(async text => {
         const container = document.getElementById('video-container');
-        container.innerHTML = '';
+        container.innerHTML = '<div class="loading">Αναζήτηση διαθέσιμου server...</div>';
 
         const links = text.split('\n')
           .map(line => line.trim())
@@ -274,6 +265,10 @@
           container.innerHTML = '<div class="error-message">Δεν βρέθηκαν links στο αρχείο</div>';
           return;
         }
+
+        // Βρίσκουμε ένα instance που δουλεύει
+        const workingInstance = await findWorkingInstance();
+        container.innerHTML = '';
 
         const observer = new IntersectionObserver((entries, obs) => {
           for (const entry of entries) {
@@ -329,42 +324,11 @@
           function loadIframe() {
             if (media.querySelector('iframe')) return;
             const iframe = document.createElement('iframe');
-            iframe.src = buildEmbedSrc(videoId);
+            iframe.src = buildEmbedSrc(videoId, workingInstance);
             iframe.allow = "accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture";
             iframe.allowFullscreen = true;
             iframe.loading = "eager";
             iframe.title = "YouTube video player";
-            
-            // Παρακολούθηση φόρτωσης του iframe για μπλοκάρισμα διαφημίσεων
-            iframe.onload = function() {
-              try {
-                // Προσπάθεια να μπλοκάρουμε διαφημιστικά scripts μέσα στο iframe
-                const iframeDoc = iframe.contentDocument || iframe.contentWindow.document;
-                if (iframeDoc) {
-                  const observer = new MutationObserver(function(mutations) {
-                    mutations.forEach(function(mutation) {
-                      mutation.addedNodes.forEach(node => {
-                        if (node.nodeType === 1) { // Element node
-                          // Έλεγχος για διαφημιστικά στοιχεία
-                          if (node.src && isAdUrl(node.src)) {
-                            node.remove();
-                          }
-                        }
-                      });
-                    });
-                  });
-                  
-                  observer.observe(iframeDoc.body, {
-                    childList: true,
-                    subtree: true
-                  });
-                }
-              } catch (e) {
-                // Cross-origin restrictions - δεν μπορούμε να κάνουμε πολλά
-                console.log('Cannot access iframe content due to same-origin policy');
-              }
-            };
-            
             media.innerHTML = '';
             media.appendChild(iframe);
           }

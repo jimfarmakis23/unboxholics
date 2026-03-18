@@ -18,7 +18,7 @@ jobs:
       - name: Βρες το τελευταίο βίντεο από το RSS
         id: get_video
         run: |
-          CHANNEL_ID="UCMiJRAwDNSNzuYeN2uWa0pA"
+          CHANNEL_ID="UCjBCvQBVTh4XjPwtSMQNcFg"
           RSS_URL="https://www.youtube.com/feeds/videos.xml?channel_id=${CHANNEL_ID}"
           
           echo "Διαβάζω το RSS από: $RSS_URL"
